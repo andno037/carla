@@ -12,34 +12,8 @@ import os
 import random
 import time
 
-# This function is here because this functionality haven't been ported to the
-# new API yet.
-def save_to_disk(image):
-    """Save this image to disk (requires PIL installed)."""
 
-    filename = '_images/{:0>6d}_{:s}.png'.format(image.frame_number, image.type)
-
-    try:
-        from PIL import Image as PImage
-    except ImportError:
-        raise RuntimeError(
-            'cannot import PIL, make sure pillow package is installed')
-
-    image = PImage.frombytes(
-        mode='RGBA',
-        size=(image.width, image.height),
-        data=image.raw_data,
-        decoder_name='raw')
-    color = image.split()
-    image = PImage.merge("RGB", color[2::-1])
-
-    folder = os.path.dirname(filename)
-    if not os.path.isdir(folder):
-        os.makedirs(folder)
-    image.save(filename)
-
-
-def main(add_a_camera, enable_autopilot):
+def main():
     client = carla.Client('localhost', 2000)
     client.set_timeout(2.0)
 
@@ -52,56 +26,43 @@ def main(add_a_camera, enable_autopilot):
 
     vehicle_blueprints = blueprint_library.filter('vehicle')
 
-
     actor_list = []
 
     try:
 
-        while True:
+        bp = random.choice(vehicle_blueprints)
 
-            bp = random.choice(vehicle_blueprints)
+        transform = carla.Transform(
+            carla.Location(x=180.0, y=199.0, z=40.0),
+            carla.Rotation(yaw=0.0))
+        vehicle = world.spawn_actor(bp, transform)
+        vehicle.set_autopilot()
 
-            if bp.contains_attribute('number_of_wheels'):
-                n = bp.get_attribute('number_of_wheels')
-                print('spawning vehicle %r with %d wheels' % (bp.id, n))
+        camera_bp = blueprint_library.find('sensor.camera.semantic_segmentation')
+        camera_transform = carla.Transform(carla.Location(x=0.4, y=0.0, z=1.4))
+        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
+        actor_list.append(camera)
 
-            color = random.choice(bp.get_attribute('color').recommended_values)
-            bp.set_attribute('color', color)
+        def save_the_fuck_out_of_this_image(image):
+            n = image.frame_number
+            image.save_to_disk('_out/%06d.png' % n)
+            image.save_to_disk('_out/%06d.jpeg' % n)
+            image.save_to_disk('_out/%06d.jpg' % n)
+            image.save_to_disk('_out/%06d.tiff' % n)
+            image.save_to_disk('_out/%06d_depth.jpeg' % n, color_converter='depth')
+            image.save_to_disk('_out/%06d_depth.png' % n, color_converter='depth')
+            image.save_to_disk('_out/%06d_depth.tiff' % n, color_converter='depth')
+            image.save_to_disk('_out/%06d_logdepth.jpeg' % n, color_converter='logdepth')
+            image.save_to_disk('_out/%06d_logdepth.png' % n, color_converter='logdepth')
+            image.save_to_disk('_out/%06d_logdepth.tiff' % n, color_converter='logdepth')
+            image.save_to_disk('_out/%06d_semseg.jpeg' % n, color_converter='semseg')
+            image.save_to_disk('_out/%06d_semseg.png' % n, color_converter='semseg')
+            image.save_to_disk('_out/%06d_semseg.tiff' % n, color_converter='semseg')
+            image.save_to_disk('_out/%06d_unknown' % n)
 
-            transform = carla.Transform(
-                carla.Location(x=180.0, y=199.0, z=40.0),
-                carla.Rotation(yaw=0.0))
+        camera.listen(save_the_fuck_out_of_this_image)
 
-            vehicle = world.try_spawn_actor(bp, transform)
-
-            if vehicle is None:
-                continue
-
-            actor_list.append(vehicle)
-
-            print(vehicle)
-
-            if add_a_camera:
-                add_a_camera = False
-
-                camera_bp = blueprint_library.find('sensor.camera')
-                # camera_bp.set_attribute('post_processing', 'Depth')
-                camera_transform = carla.Transform(carla.Location(x=0.4, y=0.0, z=1.4))
-                camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
-                camera.listen(save_to_disk)
-
-            if enable_autopilot:
-                vehicle.set_autopilot()
-            else:
-                vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-1.0))
-
-            time.sleep(3)
-
-            print('vehicle at %s' % vehicle.get_location())
-            vehicle.set_location(carla.Location(x=220, y=199, z=38))
-            print('is now at %s' % vehicle.get_location())
-
-            time.sleep(2)
+        time.sleep(10)
 
     finally:
 
@@ -111,4 +72,4 @@ def main(add_a_camera, enable_autopilot):
 
 if __name__ == '__main__':
 
-    main(add_a_camera=False, enable_autopilot=True)
+    main()

@@ -5,6 +5,8 @@
 // For a copy, see <https://opensource.org/licenses/MIT>.
 
 #include <carla/client/Sensor.h>
+#include <carla/image/ImageIO.h>
+#include <carla/image/ImageView.h>
 #include <carla/pointcloud/PLY.h>
 #include <carla/sensor/SensorData.h>
 #include <carla/sensor/data/Image.h>
@@ -79,6 +81,23 @@ static auto GetRawDataAsBuffer(T &self) {
 }
 
 template <typename T>
+static void SaveImageToDisk(T &self, const std::string &path, const std::string &cc) {
+  using namespace carla::image;
+  auto view = ImageView::MakeView(self);
+  if (cc.empty()) {
+    ImageIO::WriteView(path, view);
+  } else if (cc == "depth") {
+    ImageIO::WriteView(path, ImageView::MakeColorConvertedView(view, ColorConverter::Depth()));
+  } else if (cc == "logdepth") {
+    ImageIO::WriteView(path, ImageView::MakeColorConvertedView(view, ColorConverter::LogarithmicDepth()));
+  } else if (cc == "semseg") {
+    ImageIO::WriteView(path, ImageView::MakeColorConvertedView(view, ColorConverter::CityScapesPalette()));
+  } else {
+    throw std::invalid_argument("unknown color converter!");
+  }
+}
+
+template <typename T>
 static void SavePointCloudToDisk(T &self, const std::string &path) {
   carla::pointcloud::PLY::SaveToDisk(path, self.begin(), self.end());
 }
@@ -101,6 +120,7 @@ void export_sensor() {
     .add_property("height", &csd::Image::GetHeight)
     .add_property("fov", &csd::Image::GetFOVAngle)
     .add_property("raw_data", &GetRawDataAsBuffer<csd::Image>)
+    .def("save_to_disk", &SaveImageToDisk<csd::Image>, (arg("path"), arg("color_converter")=""))
     .def("__len__", &csd::Image::size)
     .def("__iter__", iterator<csd::Image>())
     .def(self_ns::str(self_ns::self))

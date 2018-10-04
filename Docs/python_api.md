@@ -89,6 +89,7 @@
 - `type`
 - `fov`
 - `raw_data`
+- `save_to_disk(path)`
 - `__len__()`
 - `__iter__()`
 
